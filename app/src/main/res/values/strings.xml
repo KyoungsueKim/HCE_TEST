@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">HCE_TEST</string>
+    <string name="host_apdu_service_description">HOST APDU SERVICE DESCRIPTION</string>
+    <string name="aid_group_description">AID GROUP DESCRIPTION</string>
+</resources>

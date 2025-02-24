@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<host-apdu-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/host_apdu_service_description"
+    android:requireDeviceUnlock="false">
+    <aid-group android:category="other" android:description="@string/aid_group_description">
+        <!-- 테스트용 AID, 실제 사용 시 변경 -->
+        <aid-filter android:name="D41000000702004944" />
+    </aid-group>
+</host-apdu-service>
