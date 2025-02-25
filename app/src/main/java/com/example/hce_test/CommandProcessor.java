@@ -2,7 +2,11 @@ package com.example.hce_test;
 
 
 import android.util.Log;
-import java.util.Arrays;
+
+import com.example.hce_test.utils.HexPaddingUtil;
+import com.example.hce_test.utils.HexUtilsHelper;
+import com.example.hce_test.utils.StringBuilderUtils;
+import com.example.hce_test.utils.TLVBuilder;
 
 public class CommandProcessor {
 
@@ -42,21 +46,73 @@ public class CommandProcessor {
         }
     }
 
-    // SELECT 명령 처리: 예제에서는 AID 선택 후 TLV 형식의 데이터를 리턴
+    private static byte[] extractLcData(byte[] apdu) {
+        // APDU가 null이거나 최소 헤더 길이(5바이트) 미만이면 빈 배열 반환
+        if (apdu == null || apdu.length < 5) {
+            return new byte[0];
+        }
+
+        // LC 값은 5번째 바이트(index 4)에 위치하며, unsigned 값으로 처리
+        int lc = apdu[4] & 0xFF;
+
+        // APDU 전체 길이가 헤더(5바이트) + LC 값에 명시된 데이터 길이보다 작으면 빈 배열 반환
+        if (apdu.length < 5 + lc) {
+            return new byte[0];
+        }
+
+        // LC 길이만큼 데이터를 잘라내어 반환
+        byte[] data = new byte[lc];
+        System.arraycopy(apdu, 5, data, 0, lc);
+        return data;
+    }
+
+
+    // SELECT 명령 처리: AID 선택 후 TLV 형식의 데이터를 생성하여 "9000" SW를 추가한 응답을 반환
     private static byte[] processSelect(byte[] apdu) {
-        Log.d(TAG, "Processing SELECT command");
-        // 예시 TLV 데이터 (실제 AID 등 원하는 데이터를 구성)
-        String tlvResponse = "6F208407A0000002471001A520500A564953412043415244";
-        byte[] responseData = hexStringToByteArray(tlvResponse);
-        return concatenateArrays(responseData, SW_SUCCESS);
+        final String TAG = "[APDU SELECT]";
+        // apdu가 없으면 에러 응답
+        if (apdu == null || apdu.length == 0) {
+            return ApduStatus.ERROR_6400.getValue();
+        }
+
+        // 원본에서는 commandData.getData()의 값을 사용하므로 여기서는 전달된 apdu를 그대로 사용
+        String dataHex = HexUtilsHelper.byteArrayToHexString(apdu);
+        Log.i(TAG, "data ->" + dataHex);
+
+        // TLV 빌드를 통해 응답 APDU 구성
+        String tlv50 = TLVBuilder.buildTLV("50", HexUtilsHelper.bytesToHexString("SECURE_ID".getBytes()));
+        String tlvBF0C = TLVBuilder.buildTLV("BF0C", "0000000000000000");
+        String tlv84 = TLVBuilder.buildTLV("84", "D41000000702004944");
+        String tlvA5 = TLVBuilder.buildTLV("A5", tlv50 + tlvBF0C);
+        String tlv6F = TLVBuilder.buildTLV("6F", tlv84 + tlvA5);
+
+        Log.i(TAG, "resultApdu -> " + tlv6F);
+
+        // TLV6F에 "9000" 상태 단어를 추가하여 최종 APDU 응답 생성
+        return HexUtilsHelper.hexStringToByteArray(tlv6F + "9000");
     }
 
     // READ 명령 처리: 예제에서는 "READ_DATA" 문자열을 리턴
+//    private static byte[] processRead(byte[] apdu) {
+//        Log.d(TAG, "Processing READ command");
+//        String data = "READ_DATA";
+//        byte[] dataBytes = data.getBytes();
+//        return concatenateArrays(dataBytes, SW_SUCCESS);
+//    }
     private static byte[] processRead(byte[] apdu) {
-        Log.d(TAG, "Processing READ command");
-        String data = "READ_DATA";
-        byte[] dataBytes = data.getBytes();
-        return concatenateArrays(dataBytes, SW_SUCCESS);
+        String tag = "[APDU READ]";
+        String orgName = "AJOU";
+        String orgNameHex = HexUtilsHelper.bytesToHexString(orgName.getBytes());
+        StringBuilder sb = StringBuilderUtils.build("50, ");
+        sb.append(orgName);
+        sb.append(", ");
+        sb.append(orgNameHex);
+        Log.i(tag, sb.toString());
+        String tlv50 = TLVBuilder.buildTLV("50", HexPaddingUtil.padRight(orgNameHex, 40));
+        String tlvBF0C = TLVBuilder.buildTLV("BF0C", "0100000000000000");
+        String tlv6F = TLVBuilder.buildTLV("6F", TLVBuilder.buildTLV("84", HexPaddingUtil.padRight(HexUtilsHelper.bytesToHexString(extractLcData(apdu)), 16)) + TLVBuilder.buildTLV("A5", tlv50 + tlvBF0C));
+        Log.i(tag, "resultApdu -> " + tlv6F);
+        return HexUtilsHelper.hexStringToByteArray(tlv6F + "9000");
     }
 
     // UPDATE 명령 처리: 예제에서는 업데이트 성공 시 SW_SUCCESS만 리턴
