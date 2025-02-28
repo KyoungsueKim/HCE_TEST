@@ -176,10 +176,6 @@ public class CommandProcessor {
 
         String data = generateTLVData(cardId, userId, cardIssueNo);
         return HexUtilsHelper.hexStringToByteArray(data);
-
-        // 프로프리터리 명령 처리 로직
-//        byte[] dataBytes = HexUtilsHelper.hexStringToByteArray("6F2D84084130303130312020A52150148CF6F3E786DDFFE6889317202020202020202020BF0C0801000000000000009000");
-//        return dataBytes;
     }
 
     // 헥사 문자열을 바이트 배열로 변환하는 유틸리티 메서드
