@@ -4,24 +4,37 @@ package com.example.hce_test;
 import android.util.Log;
 
 import com.example.hce_test.utils.HexPaddingUtil;
+import com.example.hce_test.utils.HexUtils;
 import com.example.hce_test.utils.HexUtilsHelper;
+import com.example.hce_test.utils.SeedEncryptionUtil;
 import com.example.hce_test.utils.StringBuilderUtils;
 import com.example.hce_test.utils.TLVBuilder;
+
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
+
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.ShortBufferException;
 
 public class CommandProcessor {
 
     private static final String TAG = "CommandProcessor";
     // 응답 SW 코드들
-    public static final byte[] SW_SUCCESS = {(byte)0x90, 0x00};
-    public static final byte[] SW_INS_NOT_SUPPORTED = {(byte)0x6D, 0x00};
-    public static final byte[] SW_UNKNOWN = {(byte)0x6F, 0x00};
+    public static final byte[] SW_SUCCESS = {(byte) 0x90, 0x00};
+    public static final byte[] SW_INS_NOT_SUPPORTED = {(byte) 0x6D, 0x00};
+    public static final byte[] SW_UNKNOWN = {(byte) 0x6F, 0x00};
 
     // INS 값 (각 명령의 INS 바이트; 실제 프로토콜에 맞게 조정)
-    private static final byte INS_SELECT   = (byte)0xA4; // SELECT
-    private static final byte INS_READ     = (byte)0xB0; // READ (예제에서는 0xB0 사용)
-    private static final byte INS_UPDATE   = (byte)0x82; // UPDATE (원본에서는 -126, 즉 0x82)
-    private static final byte INS_DELETE   = (byte)0x50; // DELETE
-    private static final byte INS_GET_DATA = (byte)0xCA; // GET DATA
+    private static final byte INS_SELECT = (byte) 0xA4; // SELECT
+    private static final byte INS_READ = (byte) 0xB0; // READ (예제에서는 0xB0 사용)
+    private static final byte INS_UPDATE = (byte) 0x82; // UPDATE (원본에서는 -126, 즉 0x82)
+    private static final byte INS_DELETE = (byte) 0x50; // DELETE
+    private static final byte INS_GET_DATA = (byte) 0xCA; // GET DATA
+    private static final byte INS_PROPRIETARY = (byte) 0xA5; // PROPRIETARY
 
     public static byte[] processApdu(byte[] commandApdu) {
         // 간단히 APDU의 INS 바이트(두 번째 바이트)를 확인
@@ -41,6 +54,8 @@ public class CommandProcessor {
                 return processDelete(commandApdu);
             case INS_GET_DATA:
                 return processGetData(commandApdu);
+            case INS_PROPRIETARY:
+                return processProprietary(commandApdu);
             default:
                 return SW_INS_NOT_SUPPORTED;
         }
@@ -117,6 +132,7 @@ public class CommandProcessor {
 
     // UPDATE 명령 처리: 예제에서는 업데이트 성공 시 SW_SUCCESS만 리턴
     private static byte[] processUpdate(byte[] apdu) {
+        final String TAG = "[APDU UPDATE]";
         Log.d(TAG, "Processing UPDATE command");
         // 업데이트 처리 로직 (예: 입력 데이터 검증 등) 후 성공 시 SW_SUCCESS 리턴
         return SW_SUCCESS;
@@ -124,6 +140,7 @@ public class CommandProcessor {
 
     // DELETE 명령 처리: 예제에서는 "DELETED" 문자열과 함께 SW_SUCCESS를 리턴
     private static byte[] processDelete(byte[] apdu) {
+        final String TAG = "[APDU DELETE]";
         Log.d(TAG, "Processing DELETE command");
         String data = "DELETED";
         byte[] dataBytes = data.getBytes();
@@ -132,19 +149,72 @@ public class CommandProcessor {
 
     // GET DATA 명령 처리: 예제에서는 "GET_DATA_RESPONSE" 문자열을 리턴
     private static byte[] processGetData(byte[] apdu) {
+        final String TAG = "[APDU GET DATA]";
         Log.d(TAG, "Processing GET DATA command");
         String data = "GET_DATA_RESPONSE";
         byte[] dataBytes = data.getBytes();
         return concatenateArrays(dataBytes, SW_SUCCESS);
     }
 
+    private static byte[] processProprietary(byte[] apdu) {
+        final String TAG = "[APDU PROPRIETARY]";
+        Log.d(TAG, "Processing PROPRIETARY command");
+        final String sessionKeyString = "IDTSESSIONKEY001";
+        final String univCd = "0124";
+        final String campusCd = "1";
+        final String userId = "202126869";
+        final String cardIssueNo = "7";
+        final String userName = "김경수";
+
+//        try {
+//            String univCampus = univCd + campusCd;
+//            Log.i(TAG, "univCd, " + univCampus);
+//            String tlvData = TLVBuilder.buildTLV("70", HexPaddingUtil.padRight(HexUtilsHelper.bytesToHexString(univCampus.getBytes()), 10)
+//                    + HexUtilsHelper.bytesToHexString("M".getBytes())
+//                    + HexPaddingUtil.padRight(HexUtilsHelper.bytesToHexString(userId.getBytes()), 32)
+//                    + HexUtilsHelper.bytesToHexString(cardIssueNo.getBytes())
+//                    + HexPaddingUtil.padRight(HexUtilsHelper.bytesToHexString(userName.getBytes()), 64)
+//                    + HexPaddingUtil.padRight(HexUtilsHelper.bytesToHexString(userId.getBytes()), 32)
+//                    + HexPaddingUtil.iso7816PadHexString(HexPaddingUtil.padRight("", 106), 110));
+//
+//            String sb = "templetData = " + tlvData;
+//            Log.i(TAG, sb);
+//
+//            byte[] idData = HexUtils.hexStringToBytes(tlvData);
+//            Log.i(TAG, "idData = " + HexUtils.bytesArrayToHexString(idData));
+//
+//            byte[] sessionKey = sessionKeyString.getBytes();
+//            Log.i(TAG, "sessionKey = " + HexUtils.bytesArrayToHexString(sessionKey));
+//
+//            byte[] cipher = null;
+//            cipher = SeedEncryptionUtil.encryptData(sessionKey, idData);
+//            Log.i(TAG, "cipher = " + HexUtils.bytesArrayToHexString(cipher));
+//
+//            byte[] responseApdu = new byte[cipher.length + 2];
+//
+//            System.arraycopy(cipher, 0, responseApdu, 0, cipher.length);
+//            System.arraycopy(ApduStatus.RESP_SUCCESS.getValue(), 0, responseApdu, cipher.length, 2);
+//
+//            Log.i(TAG, "resp = " + HexUtils.bytesArrayToHexString(responseApdu));
+//
+//            return responseApdu;
+//        } catch (NoSuchPaddingException | InvalidAlgorithmParameterException |
+//                 NoSuchAlgorithmException | NoSuchProviderException | InvalidKeyException |
+//                 ShortBufferException | IllegalBlockSizeException | BadPaddingException e) {
+//            throw new RuntimeException(e);
+//        }
+
+        // 프로프리터리 명령 처리 로직
+        byte[] dataBytes = HexUtilsHelper.hexStringToByteArray("6F2D84084130303130312020A52150148CF6F3E786DDFFE6889317202020202020202020BF0C0801000000000000009000");
+        return dataBytes;
+    }
+
     // 헥사 문자열을 바이트 배열로 변환하는 유틸리티 메서드
     public static byte[] hexStringToByteArray(String s) {
         int len = s.length();
         byte[] data = new byte[len / 2];
-        for(int i = 0; i < len; i += 2) {
-            data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4)
-                    + Character.digit(s.charAt(i+1), 16));
+        for (int i = 0; i < len; i += 2) {
+            data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4) + Character.digit(s.charAt(i + 1), 16));
         }
         return data;
     }
