@@ -178,16 +178,6 @@ public class CommandProcessor {
         return HexUtilsHelper.hexStringToByteArray(data);
     }
 
-    // 헥사 문자열을 바이트 배열로 변환하는 유틸리티 메서드
-    public static byte[] hexStringToByteArray(String s) {
-        int len = s.length();
-        byte[] data = new byte[len / 2];
-        for (int i = 0; i < len; i += 2) {
-            data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4) + Character.digit(s.charAt(i + 1), 16));
-        }
-        return data;
-    }
-
     // 두 바이트 배열을 연결하는 유틸리티 메서드
     public static byte[] concatenateArrays(byte[] a, byte[] b) {
         byte[] result = new byte[a.length + b.length];
