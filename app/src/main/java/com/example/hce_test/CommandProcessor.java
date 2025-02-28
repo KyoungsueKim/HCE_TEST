@@ -61,6 +61,23 @@ public class CommandProcessor {
         }
     }
 
+    private static String generateTLVData(String cardId, String userId, String cardIssueNo) {
+        String hexUserId = HexUtils.bytesArrayToHexString(userId.getBytes());
+        if (hexUserId.length() < 20) {
+            hexUserId = HexPaddingUtil.padRight(hexUserId, 20);
+        }
+        String hexCardIssueNo = HexUtils.bytesArrayToHexString(cardIssueNo.getBytes());
+        String tag = "[generateTLVData]";
+        Log.i(tag, "hexUserId + hexCardIssueNo -> " + hexUserId + hexCardIssueNo);
+        String sb = hexUserId + hexCardIssueNo;
+        String tlvA5 = TLVBuilder.buildTLV("A5", TLVBuilder.buildTLV("50", HexPaddingUtil.padRight(HexUtils.xorHexStrings(sb, "BEC6C1D6B4EBC7D0B1B320"), 40)) + TLVBuilder.buildTLV("BF0C", "0100000000000000"));
+        Log.i(tag, "tlv_a5 -> " + tlvA5);
+        String tlv6F = TLVBuilder.buildTLV("6F", TLVBuilder.buildTLV("84", HexPaddingUtil.padRight(HexUtilsHelper.bytesToHexString(cardId.getBytes()), 16)) + tlvA5);
+        Log.i(tag, "tlv_6f -> " + tlv6F);
+        StringBuilderUtils.logInfo("result -> ", tlv6F + "9000", tag);
+        return tlv6F + "9000";
+    }
+
     private static byte[] extractLcData(byte[] apdu) {
         // APDU가 null이거나 최소 헤더 길이(5바이트) 미만이면 빈 배열 반환
         if (apdu == null || apdu.length < 5) {
@@ -107,13 +124,7 @@ public class CommandProcessor {
         return HexUtilsHelper.hexStringToByteArray(tlv6F + "9000");
     }
 
-    // READ 명령 처리: 예제에서는 "READ_DATA" 문자열을 리턴
-//    private static byte[] processRead(byte[] apdu) {
-//        Log.d(TAG, "Processing READ command");
-//        String data = "READ_DATA";
-//        byte[] dataBytes = data.getBytes();
-//        return concatenateArrays(dataBytes, SW_SUCCESS);
-//    }
+    // READ 명령 처리:
     private static byte[] processRead(byte[] apdu) {
         String tag = "[APDU READ]";
         String orgName = "AJOU";
@@ -159,54 +170,16 @@ public class CommandProcessor {
     private static byte[] processProprietary(byte[] apdu) {
         final String TAG = "[APDU PROPRIETARY]";
         Log.d(TAG, "Processing PROPRIETARY command");
-        final String sessionKeyString = "IDTSESSIONKEY001";
-        final String univCd = "0124";
-        final String campusCd = "1";
         final String userId = "202126869";
-        final String cardIssueNo = "7";
-        final String userName = "김경수";
+        final String cardIssueNo = "2";
+        final String cardId = "115915";
 
-//        try {
-//            String univCampus = univCd + campusCd;
-//            Log.i(TAG, "univCd, " + univCampus);
-//            String tlvData = TLVBuilder.buildTLV("70", HexPaddingUtil.padRight(HexUtilsHelper.bytesToHexString(univCampus.getBytes()), 10)
-//                    + HexUtilsHelper.bytesToHexString("M".getBytes())
-//                    + HexPaddingUtil.padRight(HexUtilsHelper.bytesToHexString(userId.getBytes()), 32)
-//                    + HexUtilsHelper.bytesToHexString(cardIssueNo.getBytes())
-//                    + HexPaddingUtil.padRight(HexUtilsHelper.bytesToHexString(userName.getBytes()), 64)
-//                    + HexPaddingUtil.padRight(HexUtilsHelper.bytesToHexString(userId.getBytes()), 32)
-//                    + HexPaddingUtil.iso7816PadHexString(HexPaddingUtil.padRight("", 106), 110));
-//
-//            String sb = "templetData = " + tlvData;
-//            Log.i(TAG, sb);
-//
-//            byte[] idData = HexUtils.hexStringToBytes(tlvData);
-//            Log.i(TAG, "idData = " + HexUtils.bytesArrayToHexString(idData));
-//
-//            byte[] sessionKey = sessionKeyString.getBytes();
-//            Log.i(TAG, "sessionKey = " + HexUtils.bytesArrayToHexString(sessionKey));
-//
-//            byte[] cipher = null;
-//            cipher = SeedEncryptionUtil.encryptData(sessionKey, idData);
-//            Log.i(TAG, "cipher = " + HexUtils.bytesArrayToHexString(cipher));
-//
-//            byte[] responseApdu = new byte[cipher.length + 2];
-//
-//            System.arraycopy(cipher, 0, responseApdu, 0, cipher.length);
-//            System.arraycopy(ApduStatus.RESP_SUCCESS.getValue(), 0, responseApdu, cipher.length, 2);
-//
-//            Log.i(TAG, "resp = " + HexUtils.bytesArrayToHexString(responseApdu));
-//
-//            return responseApdu;
-//        } catch (NoSuchPaddingException | InvalidAlgorithmParameterException |
-//                 NoSuchAlgorithmException | NoSuchProviderException | InvalidKeyException |
-//                 ShortBufferException | IllegalBlockSizeException | BadPaddingException e) {
-//            throw new RuntimeException(e);
-//        }
+        String data = generateTLVData(cardId, userId, cardIssueNo);
+        return HexUtilsHelper.hexStringToByteArray(data);
 
         // 프로프리터리 명령 처리 로직
-        byte[] dataBytes = HexUtilsHelper.hexStringToByteArray("6F2D84084130303130312020A52150148CF6F3E786DDFFE6889317202020202020202020BF0C0801000000000000009000");
-        return dataBytes;
+//        byte[] dataBytes = HexUtilsHelper.hexStringToByteArray("6F2D84084130303130312020A52150148CF6F3E786DDFFE6889317202020202020202020BF0C0801000000000000009000");
+//        return dataBytes;
     }
 
     // 헥사 문자열을 바이트 배열로 변환하는 유틸리티 메서드
